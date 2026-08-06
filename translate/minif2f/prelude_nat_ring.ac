@@ -1,0 +1,82 @@
+// prelude_nat_ring.ac — miniF2F 翻译 prelude：Nat 环算术的可搜事实与已验证引理
+//
+// 背景：acorn 搜索能做单步分配律/结合律实例化，但无法对多项做
+// "多 term 重组"（环形规范化缺口）。本文件收集翻译中已验证可用的
+// 原子步骤与引理，供后续 miniF2F 翻译直接引用。
+//
+// 验证状态：acorn 0.2.4，全文件 check --strict 通过（0 searches 之外均为独立验证）。
+// 2026-08-06 由 ai-kit 翻译工作验证。
+
+from nat import Nat, add_assoc, add_comm, distrib_left, distrib_right,
+    mul_one_left, mul_one_right
+
+/// (m+1)*m = m*m + m — 左分配（搜索可直接完成）
+theorem dist_suc_left_nat(m: Nat) {
+    m.suc * m = m * m + m
+}
+
+/// m*(m+1) = m*m + m — 右分配（搜索可直接完成）
+theorem dist_suc_right_nat(m: Nat) {
+    m * m.suc = m * m + m
+}
+
+/// (m+1)*(m+1) = (m+1)*m + (m+1) — 分配展开第一步
+theorem sq_suc_step_nat(m: Nat) {
+    m.suc * m.suc = m.suc * m + m.suc
+}
+
+/// m+1 = suc(m) 的双向事实
+theorem suc_eq_add_one_nat(m: Nat) {
+    m.suc = m + Nat.1
+}
+
+/// 2m = m + m
+theorem two_mul_unfold_nat(m: Nat) {
+    Nat.2 * m = m + m
+}
+
+/// (m*m + m) * (m+1) = (m*m + m) * m + (m*m + m) — 复合因子分配
+theorem compound_dist_nat(m: Nat) {
+    (m * m + m) * m.suc = (m * m + m) * m + (m * m + m)
+}
+
+/// 2(m+1) = 2m + 2（induction_divisibility_3divnto3m2n 的步骤引理）
+theorem two_mul_suc_nat(m: Nat) {
+    Nat.2 * m.suc = Nat.2 * m + Nat.2
+}
+
+/// 重组：2x² + x + (x² + 2x + 1) = 3x² + 3x + 1（三次展开的收尾）
+theorem regroup_lemma(m: Nat) {
+    Nat.2 * (m * m) + m + (m * m + Nat.2 * m + Nat.1) =
+        Nat.3 * (m * m) + Nat.3 * m + Nat.1
+} by {
+    add_comm(m, m * m)
+    m + m * m = m * m + m
+    distrib_right(Nat.2, Nat.1, m * m)
+    (Nat.2 + Nat.1) * (m * m) = Nat.2 * (m * m) + Nat.1 * (m * m)
+    mul_one_left(m * m)
+    Nat.1 * (m * m) = m * m
+    (Nat.2 + Nat.1) * (m * m) = Nat.2 * (m * m) + m * m
+    distrib_right(Nat.2, Nat.1, m)
+    (Nat.2 + Nat.1) * m = Nat.2 * m + Nat.1 * m
+    mul_one_left(m)
+    Nat.1 * m = m
+    (Nat.2 + Nat.1) * m = Nat.2 * m + m
+    Nat.2 + Nat.1 = Nat.3
+    Nat.3 * (m * m) = Nat.2 * (m * m) + m * m
+    Nat.3 * m = Nat.2 * m + m
+    add_assoc(Nat.2 * (m * m), m, m * m + Nat.2 * m + Nat.1)
+    Nat.2 * (m * m) + m + (m * m + Nat.2 * m + Nat.1) = Nat.2 * (m * m) + (m + (m * m + Nat.2 * m + Nat.1))
+    add_assoc(m, m * m, Nat.2 * m + Nat.1)
+    m + (m * m + Nat.2 * m + Nat.1) = (m + m * m) + Nat.2 * m + Nat.1
+    add_comm(m, m * m)
+    add_assoc(Nat.2 * (m * m), m * m + m, Nat.2 * m + Nat.1)
+    Nat.2 * (m * m) + (m * m + m) + (Nat.2 * m + Nat.1) = Nat.2 * (m * m) + ((m * m + m) + (Nat.2 * m + Nat.1))
+    add_assoc(Nat.2 * (m * m), m * m, m)
+    Nat.2 * (m * m) + (m * m + m) = (Nat.2 * (m * m) + m * m) + m
+    add_assoc(m, Nat.2 * m, Nat.1)
+    m + (Nat.2 * m + Nat.1) = (m + Nat.2 * m) + Nat.1
+    add_assoc(Nat.2 * (m * m) + m * m, m, Nat.2 * m + Nat.1)
+    (Nat.2 * (m * m) + m * m) + m + (Nat.2 * m + Nat.1) = (Nat.2 * (m * m) + m * m) + (m + (Nat.2 * m + Nat.1))
+    Nat.2 * (m * m) + m + (m * m + Nat.2 * m + Nat.1) = Nat.3 * (m * m) + Nat.3 * m + Nat.1
+}
