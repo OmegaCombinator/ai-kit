@@ -1,0 +1,57 @@
+name: acorn-merge-gates
+
+# 复用 ai-kit 合并门控的 CI 工作流（用于 acornlib 系仓库的 PR/合并保护）。
+# 三个门：冲突标记门（证书/manifest 残留 <<<<<<< 即失败）、
+#         影响面报告（改动模块 -> 受影响闭包，附 PR comment 可选用）、
+#         strict 重放门（对受影响闭包 check --strict，0 searches）。
+#
+# 接入方法：
+#   1. 把本文件拷到目标仓库 .github/workflows/，并把 ai-kit 检出到
+#      .github/ai-kit（或改为 submodule）。
+#   2. 设置 repository variable ACORN_BIN_URL 或改 ACORN_BIN 路径。
+#   3. 按需开启 job 3（strict）——它依赖仓库内可用的 acorn 二进制与已提交证书。
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  conflict-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout ai-kit
+        uses: actions/checkout@v4
+        with:
+          repository: OmegaCombinator/ai-kit
+          path: .github/ai-kit
+      - name: Conflict marker gate
+        run: bash .github/ai-kit/tools/merge/conflict_marker_gate.sh
+
+  impact-report:
+    runs-on: ubuntu-latest
+    needs: conflict-gate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout ai-kit
+        uses: actions/checkout@v4
+        with:
+          repository: OmegaCombinator/ai-kit
+          path: .github/ai-kit
+      - name: Compute affected closure
+        id: impact
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          python3 .github/ai-kit/tools/merge/impact_closure.py \
+            --root . \
+            --changed "$(git diff --name-only "$BASE"...HEAD | grep '^src/.*\.ac$' | sed 's|^src/||; s|\.ac$||; s|/|.|g' | paste -sd, -)" \
+            --json || true
