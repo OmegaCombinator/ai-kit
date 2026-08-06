@@ -57,6 +57,8 @@ def main() -> int:
     ap.add_argument("--branch", required=True, help="要合并的分支名")
     ap.add_argument("--acorn", default=os.environ.get("ACORN_BIN", "acorn"))
     ap.add_argument("--strict-jobs", type=int, default=8)
+    ap.add_argument("--strict-scope", choices=["full", "closure"], default="full",
+                    help="full=全库 check --strict（集成门，默认）；closure=只查受影响闭包（开发期快速迭代）")
     ap.add_argument("--dry-run", action="store_true", help="只报告计划，不跑验证")
     ap.add_argument("--commit", default="", help="验证通过后提交信息（可选）")
     ap.add_argument("--json", action="store_true")
@@ -97,20 +99,14 @@ def main() -> int:
         git(repo, "merge", "--abort")
         return 1
 
-    # ③ 影响面
+    # ③ 影响面：以 merge --no-commit 后的暂存差异为准（最可靠），
+    #     .ac 文件变化 -> 模块名 -> impact_closure 求受影响闭包
+    staged = git(repo, "diff", "--cached", "--name-only").stdout.splitlines()
     changed = []
-    if base_manifest_sha is not None:
-        # 用 worktree 外的临时文件比较两份 manifest
-        fd, theirs_path = tempfile.mkstemp(suffix=".json")
-        with os.fdopen(fd, "w") as f:
-            f.write(git(repo, "show", f"{args.branch}^:build/manifest.json").stdout)
-        changed = json.loads(sh(repo, [sys.executable, IMPACT, "--root", repo,
-                                       "--manifest-a", base_manifest,
-                                       "--manifest-b", theirs_path,
-                                       "--json"]).stdout)["changed"]
-        os.unlink(theirs_path)
-    else:
-        changed = [f[:-3].replace(os.sep, ".") for f in changed_ac_files(repo, head, args.branch)]
+    for f in staged:
+        if f.endswith(".ac") and f.startswith("src/"):
+            changed.append(f[len("src/"):-3].replace(os.sep, "."))
+    changed = sorted(set(changed))
     closure = json.loads(sh(repo, [sys.executable, IMPACT, "--root", repo,
                                    "--changed", ",".join(changed),
                                    "--json"]).stdout)["affected_closure"]
@@ -142,15 +138,30 @@ def main() -> int:
     verify["elapsed"] = round(time.time() - tv, 1)
     report["steps"]["verify_closure"] = verify
 
-    # ⑤ 全库门
-    r = sh(repo, [args.acorn, "check", "--strict", "--jobs", str(args.strict_jobs),
-                  os.path.join(repo, "src")], check=False, timeout=7200)
-    out = r.stdout + r.stderr
-    report["steps"]["full_strict"] = {
-        "rc": r.returncode,
-        "tail": out[-1500:],
-        "elapsed": round(time.time() - tv, 1),
-    }
+    # ⑤ 全库门（--strict-scope closure 时只查闭包；check 一次一个 target，逐个跑）
+    if args.strict_scope == "closure":
+        targets = [os.path.join(repo, "src", m.replace(".", os.sep) + ".ac")
+                   for m in closure if os.path.isfile(
+                       os.path.join(repo, "src", m.replace(".", os.sep) + ".ac"))]
+        if not targets:
+            targets = [os.path.join(repo, "src")]
+        # check 不接受目录；全库模式不带 target（默认扫 src/）
+        cmd = lambda t: [args.acorn, "check", "--strict", "--jobs", str(args.strict_jobs), t]
+    else:
+        targets = [None]  # None -> 不带 target
+        cmd = lambda _t: [args.acorn, "check", "--strict", "--jobs", str(args.strict_jobs)]
+    strict = {"rc": 0, "scope": args.strict_scope, "targets": len(targets)}
+    tv2 = time.time()
+    for t in targets:
+        r = sh(repo, cmd(t), check=False, timeout=7200)
+        out = r.stdout + r.stderr
+        strict["rc"] = r.returncode if r.returncode != 0 else strict["rc"]
+        if r.returncode != 0:
+            strict.setdefault("failures", []).append({"target": t or "src/", "tail": out[-800:]})
+            print(f"merge_pipeline: strict gate failed for {t or 'src/'}", file=sys.stderr)
+            break
+    strict["elapsed"] = round(time.time() - tv2, 1)
+    report["steps"]["full_strict"] = strict
     if r.returncode != 0:
         print("merge_pipeline: full strict gate failed", file=sys.stderr)
         git(repo, "merge", "--abort")
