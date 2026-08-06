@@ -25,11 +25,14 @@
 
 预期：50–70% 合并全自动，20–35% 半自动（工具提议 + agent 确认），5–15% 需人工。
 
-## P0 — AST 重构器（下一批）
+## P0 — AST 重构器（M1 已确认 ✅）
 
 目标：把 312 个扁平 `.ac` 文件整理成规范目录结构，且不重搜、只重放。
 
-- [ ] M1 实验：验证"纯格式化/注释变化不破坏证书重放"（最关键的前提实验）
+- [x] **M1 实验（2026-08-06，acorn 0.2.4，bernoulli_pmf 84 claims）**：纯格式化（import 续行
+      合并/空行归一/注释微调）与同模块声明重排后 `check --strict` 均 **84/84 OK, 0 searches**——
+      **证书不随格式/顺序变化**，重构器前提成立（见 docs/experiments/m1-reformat-replay.md）
+- [x] `tools/refactor/reformat_probe.py`：可复现的格式化探针（原位变换 → strict check → 恢复）
 - [ ] M1：`reformat` + `split-file`（不改名）—— 复用 acorn `src/syntax/` parser + `pretty` crate
 - [ ] M2：`rename-decl` / `move-decl` + 自动 import 修复 + 影响闭包调度
 - [ ] M3：`merge-modules` / `rename-module`（兼容 stub 策略）
