@@ -17,9 +17,13 @@
 - [x] `tools/merge/manifest_merge_driver.py`：manifest.json 每 key 3-way 合并驱动
 - [x] `tools/merge/conflict_marker_gate.sh`：CI 冲突标记门
 - [x] `tools/merge/impact_closure.py`：依赖闭包影响面计算
-- [ ] `tools/merge/merge_pipeline.py`：端到端流水线（源合并 → manifest driver → 冲突检测
-      → 闭包定向 verify（串行写 manifest）→ 全库 check --strict -jN → 报告）
-- [ ] 在 acornlib-omega 上实测：对 7 个未合并 accepted 分支跑 reconciliation
+- [x] `tools/merge/merge_pipeline.py`：端到端流水线，**已在 acornlib-omega 实测通过**
+      （单模块合并 6.1s；全库 strict 门基准 **1m43s @ -j8，99155/99155 OK, 0 searches**）
+      —— 见 docs/experiments/e2e-merge-pipeline.md
+- [x] **reconciliation 核查（2026-08-06）**：acornlib-omega 全部 37 个远端分支
+      （含 7 个 accepted/domain/* 与全部 integrate/submit 分支）**均已并入 origin/main**——
+      7 月 27 日清理合并已吸收；账目报告中的"未合并分支"清单已过时
+- [ ] 用 merge_pipeline 执行剩余上游吸收（chunk 25–29 + 7 个 deferred 超时项）
 - [ ] 证书内嵌源 blake3 hash（声明级内容寻址）——把"文本冲突"变"可证明无关"
 - [ ] 审计证书 JSONL 键：是否含模块路径/位置 → 决定"移动=重键"还是"移动=重证"
 
@@ -43,7 +47,11 @@
 
 目标：模块 = 工作单元，manifest hash = 缓存键；依赖前沿调度。
 
-- [ ] 目标注册表：证书 goal 指纹查重，杜绝重复证明
+- [x] `tools/dup_scan.py`：证书目标指纹索引与查重（goal registry 离线版）。
+      实测：99154 goals / 69531 unique；**证书含大量证明局部断言**（false、a=b 等），
+      跨模块重复多为正常共享步骤——真正去重信号需声明级匹配
+      （acorn-tools §2 Declaration Extractor + §7 Theorem Index，待实现）
+- [ ] 目标注册表（声明级）：只索引顶层定理陈述，agent 开工前查重
 - [ ] 依赖 DAG 分层 + 前沿调度（并行度 = 每层模块数）
 - [ ] 批量集成队列：staging 分支 + 每批 5–10 模块一次 rebase + 闭包 strict
 - [ ] 依赖 fan-out 监控 + 大 import 增长评审门
