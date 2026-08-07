@@ -73,10 +73,14 @@ def main() -> int:
             out_lines.append(o if o is not None else t)
             continue
         if b == o:
-            out_lines.append(t)
+            # ours 未变；theirs 若删除则跳过，否则取 theirs
+            if t is not None:
+                out_lines.append(t)
             continue
         if b == t:
-            out_lines.append(o)
+            # theirs 未变；ours 若删除则跳过，否则取 ours
+            if o is not None:
+                out_lines.append(o)
             continue
         if o is None or t is None:
             # 一侧删除、一侧修改 -> 取修改侧（删除通常由 verify 重建，保守取修改侧）

@@ -1,0 +1,85 @@
+diff --git a/src/bin/acorn.rs b/src/bin/acorn.rs
+index bbdb0bc9..5b5fb429 100644
+--- a/src/bin/acorn.rs
++++ b/src/bin/acorn.rs
+@@ -457,6 +457,14 @@ enum Command {
+         )]
+         save_results: bool,
+ 
++        /// Save partial results to the cache even when some goals fail search,
++        /// so a later run resumes incrementally instead of re-searching everything.
++        #[clap(
++            long = "save-partial",
++            help = "Save proved goals' certificates even if the build has search failures."
++        )]
++        save_partial: bool,
++
+         /// Search for a proof at a specific line number (requires target)
+         #[clap(
+             long = "line",
+@@ -939,6 +947,7 @@ async fn main() {
+             read_only,
+             force_search,
+             save_results,
++            save_partial,
+             line_flag,
+             goal,
+             fail_fast,
+@@ -998,6 +1007,10 @@ async fn main() {
+                 println!("Error: {}", e);
+                 std::process::exit(1);
+             }
++            if read_only && save_partial {
++                println!("Error: --read-only cannot be used with --save-partial");
++                std::process::exit(1);
++            }
+ 
+             let verify_jobs = jobs.unwrap_or_else(default_jobs);
+             if verify_jobs == 0 {
+@@ -1048,6 +1061,7 @@ async fn main() {
+             verifier.builder.check_jobs = verify_jobs;
+             verifier.builder.shallow_search = shallow;
+             verifier.exit_on_warning = fail_fast;
++            verifier.save_partial = save_partial;
+             if let Some(t) = timeout {
+                 verifier.builder.timeout_secs = t;
+             }
+diff --git a/src/verifier.rs b/src/verifier.rs
+index 085c7341..4393b67a 100644
+--- a/src/verifier.rs
++++ b/src/verifier.rs
+@@ -338,6 +338,11 @@ pub struct Verifier {
+     /// Events collected during verification
+     events: Rc<RefCell<Vec<BuildEvent>>>,
+ 
++    /// When set, save the partial build cache (proved goals' certificates)
++    /// even if the build has search failures, enabling incremental search
++    /// across repeated verify runs.
++    pub save_partial: bool,
++
+     /// The builder for verification
+     pub builder: Builder<'static>,
+ 
+@@ -433,6 +438,7 @@ impl Verifier {
+             line_selection: None,
+             goal_index: None,
+             exit_on_warning: false,
++            save_partial: false,
+             events,
+             builder,
+             setup_time: setup_start.elapsed(),
+@@ -793,9 +799,12 @@ impl Verifier {
+             events,
+         };
+ 
+-        // Update the build cache if the build was successful
++        // Update the build cache if the build was successful, or if save_partial
++        // is set (saves the proved goals' certificates even when other goals
++        // failed search, so the next run resumes incrementally instead of
++        // re-searching everything).
+         // Pass is_partial_build flag: true if we have a specific target, false for full build
+-        if !self.builder.status.is_error() {
++        if !self.builder.status.is_error() || self.save_partial {
+             if let Some(build_cache) = self.builder.take_build_cache() {
+                 unsafe {
+                     (*self.project_ptr).update_build_cache(build_cache, is_partial_build);
