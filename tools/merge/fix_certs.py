@@ -33,11 +33,15 @@ def verify(root, acorn, path, timeout=300):
 
 
 def restore(root, path, ref):
-    if ref == ":0":
-        # 索引 stage-0（合并版）：git checkout :0 在本环境不可用，改用 checkout-index
-        git(root, "checkout-index", "-f", "--", path)
-    else:
-        git(root, "checkout", ref, "--", path)
+    try:
+        if ref == ":0":
+            # 索引 stage-0（合并版）：git checkout :0 在本环境不可用，改用 checkout-index
+            git(root, "checkout-index", "-f", "--", path)
+        else:
+            git(root, "checkout", ref, "--", path)
+    except RuntimeError:
+        # 文件不在索引/ref 中（如证书是合并新增的）——保留现状即可
+        pass
 
 
 def cert_of(f):
