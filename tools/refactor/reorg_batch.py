@@ -49,13 +49,29 @@ def main() -> int:
     domains = [d.strip() for d in args.domains.split(",") if d.strip()]
     org_map = json.load(open(args.map, encoding="utf-8"))
 
-    # 选定要移动的模块（org_map 值以某领域开头，且当前在根级）
+    # 已有包（有 interface.ac）：移入会变私有模块，跳过（保留在根）
+    packages = set()
+    for dp, _d, _f in os.walk(os.path.join(root, "src")):
+        if "interface.ac" in _f:
+            packages.add(os.path.relpath(dp, os.path.join(root, "src")))
+    print(f"reorg_batch: existing packages: {len(packages)}")
+
+    # 选定要移动的模块（org_map 值以某领域开头，且当前在根级，且目标首段不是已有包）
     moves = {}
+    skipped = []
     for mod, target in org_map.items():
         if any(target.startswith(d + "/") for d in domains):
             src = os.path.join(root, "src", mod + ".ac")
-            if os.path.isfile(src):
-                moves[mod] = target.replace("/", ".")
+            if not os.path.isfile(src):
+                continue
+            first = target.split("/", 1)[0]
+            if first in packages:
+                skipped.append(mod)
+                continue
+            moves[mod] = target.replace("/", ".")
+    if skipped:
+        print(f"reorg_batch: skipped {len(skipped)} (target is existing package): "
+              f"{skipped[:8]}...")
     if not moves:
         print(f"reorg_batch: no modules for domains {domains}", file=sys.stderr)
         return 2

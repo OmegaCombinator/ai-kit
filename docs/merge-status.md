@@ -31,3 +31,27 @@
 ## 下一步
 
 src/ 重组（org_map.json 已备好，535 模块领域映射）→ move_module.py 逐批移动。
+
+## src/ 重组进度（2026-08-07 晚）
+
+已提交 6 批（全部全库 strict 101653/101653 OK）：
+1. probability（9b04ea73）
+2. complex + category（1361a3df）
+3. graph（39e0bd69）
+4. logic（91c57a95）
+5. data/arithmetic+nat+int+fin（d244f37b）
+6. data/basic+list+finite+cardinal（8c638568 + bfd512cf）——944+ 文件改写
+7. algebra/group+monoid+basic（9d596902）
+
+**deferred**：
+- algebra/ring/field/module/lie + 散件：移动破坏 real_field 的 `∈` sugar
+  strict-replay（`Ideal.zero` 移动后 trace 不匹配，5 goals 无法重放/重搜）——
+  已回退 7b。教训：**模块移动可能改变 sugar 的 elaborate 结构，破坏既有证书
+  trace**；需要"每模块移动前先查 strict-replay 稳定性"的机制
+- 目标在已有包内的根模块（geometry/number_theory/order/polynomial/
+  combinatorics/crypto 等 50 个）：移入会变 package-private，需接口再导出机制
+
+## 工具链新增
+
+- reorg_batch.py：org_map 驱动批量移动（包守卫、缩进 import、点/斜杠修正）
+- union_sources.py：接口声明级并集（attributes 复数/instance 同名/多行参数修复）
