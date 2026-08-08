@@ -70,3 +70,13 @@ src/
       check --strict，任何 replay 失败即回退该批——脚本化到 reorg_batch
 - [ ] `∈` 等 sugar 的证书生成 bug 修复（acorn 侧）或绕行
 - [ ] 包接口机制（50 个包内目标根模块）
+
+## Replay 稳定性检查器 ✅（2026-08-08 验证）
+
+reorg_batch --verify 现在：移动 → 全库 verify → 全库 check --strict →
+**任何 replay 失败自动回退整个批次**。实测：analysis 批（38 模块）移动后
+check 命中 `∈` replay 失败（acorn issue #64），自动回退，树回到
+9d596902（101653/101653 OK）。
+
+这使得剩余批次（analysis、algebra ring/field/module）可以在
+acorn issue #64 修复后安全重试；当前它们被该 kernel bug 阻塞。

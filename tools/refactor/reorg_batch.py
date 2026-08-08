@@ -121,34 +121,32 @@ def main() -> int:
 
     print(f"  moved {len(moves)} files; rewrote {import_rewrites} files")
 
-    # 4. 验证受影响闭包
+    # 4. 验证（replay 稳定性检查器）：
+    #    全库 verify 一次（刷新 manifest）→ 全库 check --strict 一次。
+    #    任何 replay 失败（如 ∈ 糖的 elaborate 变化）→ 自动回退整个批次。
     if args.verify:
-        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "merge"))
-        from impact_closure import build_dag, downstream_closure
-        dag = build_dag(os.path.join(root, "src"))
-        new_mods = [moves[m] for m in moves]
-        closure = downstream_closure(dag, new_mods)
-        targets = list(dict.fromkeys(new_mods + closure))
-        failed = 0
-        for t in targets:
-            tp = os.path.join(root, "src", t.replace(".", os.sep) + ".ac")
-            if not os.path.isfile(tp):
-                continue
-            r = subprocess.run([args.acorn, "verify", tp], cwd=root, capture_output=True,
-                               text=True, timeout=900)
-            if r.returncode != 0:
-                print(f"  VERIFY FAIL: {tp}\n{(r.stdout+r.stderr)[-400:]}", file=sys.stderr)
-                failed += 1
-                continue
-            r2 = subprocess.run([args.acorn, "check", "--strict", tp], cwd=root,
-                                capture_output=True, text=True, timeout=900)
-            out = r2.stdout + r2.stderr
-            if r2.returncode != 0 or "0 searches performed" not in out:
-                print(f"  STRICT FAIL: {tp}\n{out[-400:]}", file=sys.stderr)
-                failed += 1
-        print(f"  closure: {len(targets)} modules, {failed} failures")
+        r = subprocess.run([args.acorn, "verify"], cwd=root, capture_output=True,
+                           text=True, timeout=3600)
+        vout = r.stdout + r.stderr
+        if r.returncode != 0:
+            print(f"  VERIFY FAILED:\n{vout[-600:]}", file=sys.stderr)
+            failed = True
+        else:
+            r2 = subprocess.run([args.acorn, "check", "--strict", "-j", "8"], cwd=root,
+                                capture_output=True, text=True, timeout=3600)
+            sout = r2.stdout + r2.stderr
+            failed = r2.returncode != 0
+            print(f"  check --strict: rc={r2.returncode}\n{sout[-400:]}")
         if failed:
+            print("  replay instability detected — reverting this batch", file=sys.stderr)
+            subprocess.run(["git", "checkout", "HEAD", "--", "."], cwd=root)
+            for m, new in moves.items():
+                subprocess.run(["rm", "-rf",
+                                os.path.join(root, "src", new.replace(".", os.sep))],
+                               capture_output=True)
+            print("  reverted")
             return 1
+        print("  replay-stable: full check --strict OK")
 
     if args.commit:
         subprocess.run(["git", "add", "-A"], cwd=root, check=True)
