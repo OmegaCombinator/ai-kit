@@ -15,3 +15,12 @@
 - 分析：∈ 是 contains 语法糖；证书 goal 无类型信息，re-elaboration 不稳定
 - 建议修复方向：① claim 序列化时脱糖为 .contains 形式；② trace 步骤比较
   对布尔等值归约方向不敏感；③ 查 skolem 结构随实例作用域变化的原因
+
+## 上游 PR #65：br 步骤配对方向修复
+
+- https://github.com/acornprover/acorn/pull/65
+- 根因：布尔等值归约的 trace 记录一个方向，重放重算产生逆否方向
+  （候选 ¬a ∨ (b=c) vs 记录 (b≠c) ∨ a），exact/canonical 比较不等价
+- 修复：br 步骤校验对 BooleanEquality/BooleanInequality 归约增加配对方向回退
+- 验证：ideal.ac 263/583 → 583/583；全库 101653/101653 OK；cargo test 1419 全过
+- 二进制：workspace/acornlib/bin/acorn-0.2.6-fixed-linux-x64
