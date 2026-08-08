@@ -53,3 +53,20 @@ src/
       combinatorics/crypto）并入各自包
 - [ ] replay 稳定性检查器：移动前对闭包跑 check --strict，不稳定则跳过
 - [ ] erdos396 适配（旧 API → 新 list/nat）
+
+## 2026-08-08 更新：analysis 批次回退
+
+- analysis/topology+metric+sequence+dynamical（46 模块）移动后，全库 verify 通过
+  （搜索重生成证书）但 **check --strict 失败**：ideal/ideal_product/integral_domain/
+  ideal_quotient_universal/group_hom_kernel_subgroup 的 `x0 ∈ Ideal.zero[T0]`
+  replay 报 "certificate trace br step does not apply"——`∈` 糖的 elaborate
+  受实例解析环境影响，模块移动改变实例作用域 → 旧证书 trace 不匹配，
+  且 verify 生成的替代证书也不可重放（prover 生成 bug，与 Top100 #52 同类）
+- 已回退；树保持在 9d596902（7 批提交，101653/101653 OK）
+
+## 前置机制（未做不能安全移动）
+
+- [ ] **replay 稳定性检查器**：移动一批模块后，先对受影响闭包跑
+      check --strict，任何 replay 失败即回退该批——脚本化到 reorg_batch
+- [ ] `∈` 等 sugar 的证书生成 bug 修复（acorn 侧）或绕行
+- [ ] 包接口机制（50 个包内目标根模块）
