@@ -80,3 +80,29 @@ check 命中 `∈` replay 失败（acorn issue #64），自动回退，树回到
 
 这使得剩余批次（analysis、algebra ring/field/module）可以在
 acorn issue #64 修复后安全重试；当前它们被该 kernel bug 阻塞。
+
+## 重组完成（2026-08-08 晚）
+
+根散件 **535 → 51**（90.5% 已组织）。10 批全部全库 check --strict
+101653/101653 OK：
+
+| 批 | 内容 | 提交 |
+|---|---|---|
+| 1 | probability | 9b04ea73 |
+| 2 | complex+category | 1361a3df |
+| 3 | graph | 39e0bd69 |
+| 4 | logic | 91c57a95 |
+| 5 | data/arithmetic+nat+int+fin | d244f37b |
+| 6 | data/basic+list+finite+cardinal | 8c638568 |
+| 7a | algebra/group+monoid+basic | 9d596902 |
+| 8 | analysis/topology+metric+sequence | 6144cd09 |
+| 9 | analysis/dynamical+real | 711862ab |
+| 10 | algebra ring/field/module/lie | 8dcbabee |
+| 11 | forward_diff/parametric_solutions/rat_int_hom/util | 9e7890cd |
+
+**关键突破**：acorn PR #65（br 步骤配对方向修复）解除了 ∈-sugar replay bug
+（#64）对批次 8-10 的阻塞。
+
+**剩余 51 个根散件**：目标在已有包内（geometry/order/number_theory/
+polynomial/combinatorics/crypto 的根模块）+ prelude（loader 特殊模块，
+不可移动）。需要包接口机制（interface 再导出）才能并入，为下一阶段任务。
